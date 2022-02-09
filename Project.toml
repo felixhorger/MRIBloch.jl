@@ -1,0 +1,4 @@
+name = "MRIBloch"
+uuid = "588e7348-2635-4912-9b98-82f2adfcae4d"
+authors = ["Felix Horger <felix.horger@kcl.ac.uk>"]
+version = "0.1.0"
