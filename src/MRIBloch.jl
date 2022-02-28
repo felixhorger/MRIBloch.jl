@@ -49,7 +49,7 @@ module MRIBloch
 	function simulate(m0, Δω0, ω1, dt)
 		# Memory for magnetisation
 		m = Array{Float64}(undef, 3, 1+length(Δω0))
-		m[:, 1] = m0
+		m[:, 1] .= m0
 		# Precompute flip angles
 		α = @. dt * sqrt(Δω0^2 + ω1^2)
 		# Run
@@ -60,7 +60,7 @@ module MRIBloch
 			n = n ./ norm(n)
 			rotation_matrix(α[t], n; out=R)
 			# Apply
-			m[:, t+1] = R * @view m[:, t]
+			@views m[:, t+1] = R * m[:, t]
 		end
 		return m
 	end
