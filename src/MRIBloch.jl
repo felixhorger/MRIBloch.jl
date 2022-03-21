@@ -3,50 +3,11 @@ module MRIBloch
 	
 	using LinearAlgebra
 
-	# TODO: Rotations.jl
-	function rotation_matrix(α::Real, n::NTuple{3, <: Real}; out=Matrix{Float64}(undef, 3, 3))
-		# Arbitrary axis
-		# Apply vector from the right
-		(sinα, cosα) = sincos(α)
-		one_minus_cosα = (1 - cosα)
-		# First column
-		out[1, 1] = cosα + n[1]^2 * one_minus_cosα
-		out[2, 1] = n[1] * n[2] * one_minus_cosα + n[3] * sinα
-		out[3, 1] = n[1] * n[3] * one_minus_cosα - n[2] * sinα
-		# Second column
-		out[1, 2] = n[1] * n[2] * one_minus_cosα - n[3] * sinα
-		out[2, 2] = cosα + n[2]^2 * one_minus_cosα
-		out[3, 2] = n[2] * n[3] * one_minus_cosα + n[1] * sinα
-		# Third column
-		out[1, 3] = n[1] * n[3] * one_minus_cosα + n[2] * sinα
-		out[2, 3] = n[2] * n[3] * one_minus_cosα - n[1] * sinα
-		out[3, 3] = cosα + n[3]^2 * one_minus_cosα
-		return out
-	end
+	include("rotation_matrices.jl")
 
-	function rotation_matrix(α::Real, θ::Real; out=Matrix{Float64}(undef, 3, 3))
-		# This is for B1 in xy plane
-		# Apply vector from the right
-		(sinα, cosα) = sincos(α)
-		(sinθ, cosθ) = sincos(θ)
-		# First column
-		out[1, 1] = sinθ^2 + cosα * cosθ^2
-		out[2, 1] = sinθ * cosθ - cosα * sinθ * cosθ
-		out[3, 1] = -sinα * cosθ
-		# Second column
-		out[1, 2] = sinθ * cosθ - cosα * sinθ * cosθ
-		out[2, 2] = cosθ^2 + cosα * sinθ^2
-		out[3, 2] = sinα * sinθ
-		# Third column
-		out[1, 3] = sinα * cosθ
-		out[2, 3] = -sinα * sinθ
-		out[3, 3] = cosα
+	# TODO: MAKE GENERATED?
 
-		return out
-	end
-
-
-	function simulate(m0, Δω0, ω1, dt)
+	function simulate(mode::Val{:pulse_frame}, m0::NTuple{3, <: Real}, ω1::AbstractVector{<: Real}, Δω0::AbstractVector{<: Real}, dt::Real)
 		# Memory for magnetisation
 		m = Array{Float64}(undef, 3, 1+length(Δω0))
 		m[:, 1] .= m0
@@ -56,14 +17,47 @@ module MRIBloch
 		R = Matrix{Float64}(undef, 3, 3)
 		for t = 1:length(α)
 			# Compute rotation axis and matrix
-			n = (ω1[t], 0.0, -Δω0[t])
-			n = n ./ norm(n)
-			rotation_matrix(α[t], n; out=R)
+			axis = (ω1[t], -Δω0[t])
+			axis = axis ./ norm(axis)
+			rotation_matrix(Val(:xz), axis, α[t]; out=R)
 			# Apply
 			@views m[:, t+1] = R * m[:, t]
 		end
 		return m
 	end
 
+	#function simulate(mode::Val{:B0_frame}, m0::NTuple{3, <: Real}, ω1::AbstractVector{<: Real}, ϕ::AbstractVector{<: Real}, dt::Real)
+	#	# Memory for magnetisation
+	#	m = Array{Float64}(undef, 3, 1+length(ϕ))
+	#	m[:, 1] .= m0
+	#	# Run
+	#	R = Matrix{Float64}(undef, 3, 3)
+	#	for t = 1:length(α)
+	#		# Compute rotation axis and matrix
+	#		α = dt * ω1[t]
+	#		rotation_matrix(Val(:xy), ϕ[t], α; out=R)
+	#		# Apply
+	#		@views m[:, t+1] = R * m[:, t]
+	#	end
+	#	return m
+	#end
+
+	function simulate(mode::Val{:B0_frame}, m0::NTuple{3, <: Real}, ω1::AbstractVector{<: Complex}, dt::Real)
+		# Memory for magnetisation
+		m = Array{Float64}(undef, 3, 1+length(ω1))
+		m[:, 1] .= m0
+		# Run
+		R = Matrix{Float64}(undef, 3, 3)
+		for t = 1:length(ω1)
+			# Compute rotation axis and matrix
+			abs_ω1 = abs(ω1[t])
+			α = dt * abs_ω1
+			axis = ω1[t] / abs_ω1
+			rotation_matrix(Val(:xy), reim(axis), α; out=R)
+			# Apply
+			@views m[:, t+1] = R * m[:, t]
+		end
+		return m
+	end
 end
 
