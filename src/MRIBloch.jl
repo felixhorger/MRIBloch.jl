@@ -7,6 +7,7 @@ module MRIBloch
 
 	# TODO: MAKE GENERATED?
 
+	# Why doesn't this take complex ω1?
 	function simulate(mode::Val{:pulse_frame}, m0::NTuple{3, <: Real}, ω1::AbstractVector{<: Real}, Δω0::AbstractVector{<: Real}, dt::Real)
 		# Memory for magnetisation
 		m = Array{Float64}(undef, 3, 1+length(Δω0))
@@ -18,10 +19,15 @@ module MRIBloch
 		for t = 1:length(α)
 			# Compute rotation axis and matrix
 			axis = (ω1[t], -Δω0[t])
-			axis = axis ./ norm(axis)
-			rotation_matrix(Val(:xz), axis, α[t]; out=R)
+			abs_ω = norm(axis)
 			# Apply
-			@views m[:, t+1] = R * m[:, t]
+			if abs_ω == 0
+				@views m[:, t+1] = m[:, t]
+			else
+				axis = axis ./ abs_ω
+				rotation_matrix(Val(:xz), axis, α[t]; out=R)
+				@views m[:, t+1] = R * m[:, t]
+			end
 		end
 		return m
 	end
@@ -52,10 +58,14 @@ module MRIBloch
 			# Compute rotation axis and matrix
 			abs_ω1 = abs(ω1[t])
 			α = dt * abs_ω1
-			axis = ω1[t] / abs_ω1
-			rotation_matrix(Val(:xy), reim(axis), α; out=R)
 			# Apply
-			@views m[:, t+1] = R * m[:, t]
+			if abs_ω1 == 0.0
+				@views m[:, t+1] = m[:, t]
+			else
+				axis = ω1[t] / abs_ω1
+				rotation_matrix(Val(:xy), reim(axis), α; out=R)
+				@views m[:, t+1] = R * m[:, t]
+			end
 		end
 		return m
 	end
